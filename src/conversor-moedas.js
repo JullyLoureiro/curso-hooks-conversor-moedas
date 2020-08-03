@@ -4,8 +4,12 @@ import {Jumbotron, Button, Form, Col, Spinner, Alert, Modal} from 'react-bootstr
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome'
 import {faAngleDoubleRight} from '@fortawesome/free-solid-svg-icons'
 import ListarMoedas from './listar-moedas'
+import axios from 'axios'
 
 function ConversorMoedas() {
+
+  const FIXER_URL = 'http://data.fixer.io/api/latest?access_key=a5d946bb85ad53756e9bf39004b48b9f'
+
   const [valor, setValor] = useState(1)
   const [moedaDe, setMoedaDe] = useState('BRL')
   const [moedaPara, setMoedaPara] = useState('USD')
@@ -13,6 +17,7 @@ function ConversorMoedas() {
   const [exibirModal, setExibirModal] = useState(false)
   const [resultadoConversao, setResultadoConversao] = useState('')
   const [formValidado, setFormValidado] = useState(false)
+  const [exibirMsgErro, setExibirMsgErro] = useState(false)
 
   function handleValor(event){
         setValor(event.target.value.replace(/\D/g, ''))
@@ -30,8 +35,37 @@ function ConversorMoedas() {
     event.preventDefault()
     setFormValidado(true)
     if(event.currentTarget.checkValidity() === true) {
-        setExibirModal(true)
+        setExibirSpinner(true)
+        axios.get(FIXER_URL)
+        .then(res=>{
+            const cotacao = obterCotacao(res.data)
+            if(cotacao) {
+              setResultadoConversao(`${valor} ${moedaDe} = ${cotacao} ${moedaPara}`)
+              setExibirModal(true)
+              setExibirSpinner(false)
+              setExibirMsgErro(false)
+            } else {
+              exibirErro()
+            }
+            
+        })
+        .catch(error=>exibirErro())
     }
+  }
+
+  function obterCotacao(dadosCotacao){
+      if(!dadosCotacao || dadosCotacao.success !== true) return false
+
+      const cotacaoDe = dadosCotacao.rates[moedaDe]
+      const cotacaoPara = dadosCotacao.rates[moedaPara]
+
+      const cotacao = (1 / cotacaoDe * cotacaoPara) * valor
+      return cotacao.toFixed(2)
+  }
+
+  function exibirErro(){
+      setExibirMsgErro(true)
+      setExibirSpinner(false)
   }
 
   function handleFecharModal(event){
@@ -45,7 +79,7 @@ function ConversorMoedas() {
   return (
     <div style={{padding: 10}}>
       <h1>Conversor de Moedas</h1>
-      <Alert variant="danger" show={false}>
+      <Alert variant="danger" show={exibirMsgErro}>
         Erro obtendo dados de conversão, tente novamente!
       </Alert>
       <Jumbotron>
@@ -68,7 +102,7 @@ function ConversorMoedas() {
                       </Form.Control>
                   </Col>
                   <Col sm="2">
-                      <Button variant="success" type="submit">
+                      <Button variant="success" type="submit" data-testid='btn-converter'>
                         <span className={exibirSpinner ? null : 'hidden'}>
                             <Spinner animation="border" size="sm" />
                         </span>
@@ -77,7 +111,7 @@ function ConversorMoedas() {
                   </Col>
               </Form.Row>
           </Form>
-          <Modal show={exibirModal} onHide={handleFecharModal}>
+          <Modal show={exibirModal} onHide={handleFecharModal} data-testid="modal">
               <Modal.Header closeButton>
                   <Modal.Title>Conversão</Modal.Title>
               </Modal.Header>
